@@ -15,7 +15,7 @@ Hibira app), with pixel-realm's dev/rc/release tags on top.
 | Server | Chosen at build time: DEV `aetherfall-dev.hibira.io`, UAT `aetherfall-uat.hibira.io`, PRD `aetherfall.hibira.io` (`VITE_SERVER_ORIGIN` in the client). The server must list `capacitor://localhost` and `https://localhost` in `ALLOWED_ORIGINS` |
 | User agent | ends in `AetherfallApp/ios` or `AetherfallApp/android` |
 | Icons and splash | **Placeholders** (Capacitor's defaults) until Codex delivers the app icon and splash art |
-| Sold in the app | Nothing yet. Any later purchase goes through Apple IAP / Google Play Billing, verified and granted once on the Go server |
+| Sold in the app | Cosmetics through Apple IAP / Google Play Billing only, via `@capgo/native-purchases` (8.9.6, MPL-2.0). The game client opens the store sheet, the Go server verifies and grants once, then the client finishes the transaction (Google purchases are acknowledged by the server). No web checkout link in the app. Products, prices and store sync are managed in the game's `/console` (pixel-realm `docs/operations/shop-payments.md`). iOS needs no extra entitlement for IAP; Android's `BILLING` permission comes with the billing library |
 
 Plan and open decisions: the mobile plan doc in the project (Capacitor chosen over React Native and native),
 and pixel-realm's `docs/gameplay/product-mobile-strategy-v1.0.md` (Codex's design baseline, gates G1–G3).
