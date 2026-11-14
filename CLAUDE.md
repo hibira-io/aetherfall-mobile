@@ -30,7 +30,7 @@ these rules; keep the two in step.
 - Releases are tags: `vX.Y.Z-dev.N` → DEV, `-rc.N` → UAT, `vX.Y.Z` → PRD. Never push a PRD tag, submit for App
   Store review or roll out on Play without Danny's approval.
 - Work on a branch, open a draft PR to `main`; the project's merge thread merges.
-- CI reads private pixel-realm with the fine-grained token `PIXEL_REALM_TOKEN` (Contents read; deploy keys are off in the enterprise) or a deploy key `PIXEL_REALM_DEPLOY_KEY`; `scripts/build-web.sh` then uses that checkout (`PIXEL_REALM_DIR`).
+- CI reads private pixel-realm through the org GitHub App **Hibira CI** (`vars.HIBIRA_CI_APP_CLIENT_ID`, `secrets.HIBIRA_CI_APP_PRIVATE_KEY`, actions/create-github-app-token, Contents read on pixel-realm only); deploy keys are off in the enterprise. `scripts/build-web.sh` then uses that checkout (`PIXEL_REALM_DIR`).
 - Secrets only in GitHub secrets (org-level shared with hibira-app). Never commit keystores, `.p8` keys,
   `google-services.json` or `.env`.
 

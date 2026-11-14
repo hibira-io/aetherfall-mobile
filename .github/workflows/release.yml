@@ -12,8 +12,8 @@
 #   Android  ANDROID_UPLOAD_KEYSTORE (base64 of the .jks),
 #            ANDROID_UPLOAD_PASSWORD,
 #            PLAY_SERVICE_ACCOUNT_JSON (optional: upload to Play)
-#   Game     PIXEL_REALM_TOKEN (fine-grained, Contents: read on hibira-io/pixel-realm)
-#            or PIXEL_REALM_DEPLOY_KEY (read-only deploy key, if the org allows them)
+#   Game     HIBIRA_CI_APP_CLIENT_ID (org variable), HIBIRA_CI_APP_PRIVATE_KEY (org
+#            secret): the Hibira CI GitHub App, installed on pixel-realm
 name: release
 on:
   push:
@@ -48,18 +48,26 @@ jobs:
         id: pr
         env:
           OVERRIDE: ''
-          KEY: ${{ secrets.PIXEL_REALM_DEPLOY_KEY }}
-          TOKEN: ${{ secrets.PIXEL_REALM_TOKEN }}
+          CLIENT_ID: ${{ vars.HIBIRA_CI_APP_CLIENT_ID }}
+          KEY: ${{ secrets.HIBIRA_CI_APP_PRIVATE_KEY }}
         run: |
-          [ -n "$KEY" ] || [ -n "$TOKEN" ] || { echo "::error::Missing secret PIXEL_REALM_TOKEN (fine-grained token, Contents read on hibira-io/pixel-realm) or PIXEL_REALM_DEPLOY_KEY: see README"; exit 1; }
+          [ -n "$CLIENT_ID" ] && [ -n "$KEY" ] || { echo "::error::Missing variable HIBIRA_CI_APP_CLIENT_ID or secret HIBIRA_CI_APP_PRIVATE_KEY (the Hibira CI GitHub App): see README"; exit 1; }
           echo "ref=${OVERRIDE:-$(tr -d '[:space:]' < pixel-realm.ref)}" >> "$GITHUB_OUTPUT"
+      # A one-hour token that can only read pixel-realm (pixel-realm is private).
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.HIBIRA_CI_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HIBIRA_CI_APP_PRIVATE_KEY }}
+          owner: hibira-io
+          repositories: pixel-realm
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: hibira-io/pixel-realm
           ref: ${{ steps.pr.outputs.ref }}
           path: .cache/pixel-realm
-          ssh-key: ${{ secrets.PIXEL_REALM_DEPLOY_KEY }}
-          token: ${{ secrets.PIXEL_REALM_TOKEN || github.token }}
+          token: ${{ steps.app.outputs.token }}
           persist-credentials: false
       - run: scripts/build-web.sh
         env:
