@@ -44,10 +44,26 @@ jobs:
           echo "name=$V" >> "$GITHUB_OUTPUT"
           echo "code=$(( (10#${BASH_REMATCH[1]} * 1000000 + 10#${BASH_REMATCH[2]} * 1000 + 10#${BASH_REMATCH[3]}) * 100 ))" >> "$GITHUB_OUTPUT"
 
+      - name: pixel-realm ref
+        id: pr
+        env:
+          OVERRIDE: ${{ inputs.pixel_realm_ref }}
+          KEY: ${{ secrets.PIXEL_REALM_DEPLOY_KEY }}
+        run: |
+          [ -n "$KEY" ] || { echo "::error::Missing secret PIXEL_REALM_DEPLOY_KEY (read-only deploy key of hibira-io/pixel-realm): see README"; exit 1; }
+          echo "ref=${OVERRIDE:-$(tr -d '[:space:]' < pixel-realm.ref)}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: hibira-io/pixel-realm
+          ref: ${{ steps.pr.outputs.ref }}
+          path: .cache/pixel-realm
+          ssh-key: ${{ secrets.PIXEL_REALM_DEPLOY_KEY }}
+          persist-credentials: false
       - name: Game client
         env:
           AETHERFALL_ENV: ${{ inputs.server }}
-          PIXEL_REALM_REF: ${{ inputs.pixel_realm_ref }}
+          PIXEL_REALM_DIR: .cache/pixel-realm
+          PIXEL_REALM_REF: ${{ steps.pr.outputs.ref }}
         run: scripts/build-web.sh && cat www/build-info.json >> "$GITHUB_STEP_SUMMARY"
 
       - name: Keys

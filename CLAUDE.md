@@ -30,6 +30,7 @@ these rules; keep the two in step.
 - Releases are tags: `vX.Y.Z-dev.N` → DEV, `-rc.N` → UAT, `vX.Y.Z` → PRD. Never push a PRD tag, submit for App
   Store review or roll out on Play without Danny's approval.
 - Work on a branch, open a draft PR to `main`; the project's merge thread merges.
+- CI reads private pixel-realm with the read-only deploy key `PIXEL_REALM_DEPLOY_KEY`; `scripts/build-web.sh` then uses that checkout (`PIXEL_REALM_DIR`).
 - Secrets only in GitHub secrets (org-level shared with hibira-app). Never commit keystores, `.p8` keys,
   `google-services.json` or `.env`.
 

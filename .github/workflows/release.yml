@@ -12,6 +12,7 @@
 #   Android  ANDROID_UPLOAD_KEYSTORE (base64 of the .jks),
 #            ANDROID_UPLOAD_PASSWORD,
 #            PLAY_SERVICE_ACCOUNT_JSON (optional: upload to Play)
+#   Game     PIXEL_REALM_DEPLOY_KEY (read-only deploy key of hibira-io/pixel-realm)
 name: release
 on:
   push:
@@ -42,9 +43,26 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with: { node-version: 22 }
+      - name: pixel-realm ref
+        id: pr
+        env:
+          OVERRIDE: ''
+          KEY: ${{ secrets.PIXEL_REALM_DEPLOY_KEY }}
+        run: |
+          [ -n "$KEY" ] || { echo "::error::Missing secret PIXEL_REALM_DEPLOY_KEY (read-only deploy key of hibira-io/pixel-realm): see README"; exit 1; }
+          echo "ref=${OVERRIDE:-$(tr -d '[:space:]' < pixel-realm.ref)}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: hibira-io/pixel-realm
+          ref: ${{ steps.pr.outputs.ref }}
+          path: .cache/pixel-realm
+          ssh-key: ${{ secrets.PIXEL_REALM_DEPLOY_KEY }}
+          persist-credentials: false
       - run: scripts/build-web.sh
         env:
           AETHERFALL_ENV: ${{ needs.version.outputs.env }}
+          PIXEL_REALM_DIR: .cache/pixel-realm
+          PIXEL_REALM_REF: ${{ steps.pr.outputs.ref }}
       - run: cat www/build-info.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with: { name: www, path: www, retention-days: 30 }
