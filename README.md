@@ -61,6 +61,19 @@ is, a Play install can't update the hand-installed APK (different signing key), 
 Pull requests build both apps without signing (`ci.yml`) and keep a debug APK (DEV server) as the run's
 artifact. **android-apk** (Run workflow) makes a signed APK for any server to install by hand.
 
+## App Store listing
+
+The iOS listing lives in `store/ios/` and goes to App Store Connect from CI,
+as in hibira-io/hibira-app: Actions → **app-store** → Run workflow (step
+`all`, or one of `metadata`, `screenshots`, `pricing`, `build`, `inspect`).
+`store/ios/metadata/<locale>.json` holds the texts, `metadata/app.json` the
+categories, age rating and review notes, `screenshots/<locale>/` the
+2868x1320 landscape shots. The review contact is copied from the Hibira app;
+a demo account comes from the repo secrets `ASC_DEMO_USER` /
+`ASC_DEMO_PASSWORD`. App Privacy has no API: fill it in by hand from
+`store/ios/privacy.md`. The workflow never submits for review; Danny presses
+**Add for Review** in App Store Connect.
+
 ## One-time setup
 
 Most of it is shared with the Hibira app (same Apple team and org secrets):
