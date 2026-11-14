@@ -64,10 +64,11 @@ Most of it is shared with the Hibira app (same Apple team and org secrets):
    `keytool -genkeypair -keystore upload.jks -alias upload -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=Aetherfall, O=Hibira, C=TW"`,
    then `base64 -i upload.jks | gh secret set ANDROID_UPLOAD_KEYSTORE -R hibira-io/aetherfall-mobile`.
 3. **Play Console.** Create the app `io.hibira.aetherfall`; the very first bundle is uploaded by hand.
-4. **pixel-realm read access.** pixel-realm is private, so CI reads it with a read-only deploy key:
-   `ssh-keygen -t ed25519 -N "" -C aetherfall-mobile-ci -f pixel-realm-deploy`, add `pixel-realm-deploy.pub` under
-   pixel-realm → Settings → Deploy keys (leave "Allow write access" off), and save the private key as this repo's
-   secret `PIXEL_REALM_DEPLOY_KEY` (`gh secret set PIXEL_REALM_DEPLOY_KEY -R hibira-io/aetherfall-mobile < pixel-realm-deploy`).
+4. **pixel-realm read access.** pixel-realm is private, so CI needs read access to it. The hibira-io enterprise
+   turns deploy keys off, so use a fine-grained personal access token: GitHub → Settings → Developer settings →
+   Fine-grained tokens → Generate, resource owner **hibira-io**, only repository **pixel-realm**, permission
+   **Contents: Read-only**. Save it as this repo's secret `PIXEL_REALM_TOKEN`. (If deploy keys are ever allowed, a
+   read-only deploy key in `PIXEL_REALM_DEPLOY_KEY` works too.)
 5. **Environments.** `DEV`, `UAT` and `PRD` are created on first use; give `PRD` a required reviewer.
 
 ## What comes next

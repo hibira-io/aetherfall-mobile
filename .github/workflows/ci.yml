@@ -37,8 +37,9 @@ jobs:
         env:
           OVERRIDE: ''
           KEY: ${{ secrets.PIXEL_REALM_DEPLOY_KEY }}
+          TOKEN: ${{ secrets.PIXEL_REALM_TOKEN }}
         run: |
-          [ -n "$KEY" ] || { echo "::error::Missing secret PIXEL_REALM_DEPLOY_KEY (read-only deploy key of hibira-io/pixel-realm): see README"; exit 1; }
+          [ -n "$KEY" ] || [ -n "$TOKEN" ] || { echo "::error::Missing secret PIXEL_REALM_TOKEN (fine-grained token, Contents read on hibira-io/pixel-realm) or PIXEL_REALM_DEPLOY_KEY: see README"; exit 1; }
           echo "ref=${OVERRIDE:-$(tr -d '[:space:]' < pixel-realm.ref)}" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -46,6 +47,7 @@ jobs:
           ref: ${{ steps.pr.outputs.ref }}
           path: .cache/pixel-realm
           ssh-key: ${{ secrets.PIXEL_REALM_DEPLOY_KEY }}
+          token: ${{ secrets.PIXEL_REALM_TOKEN || github.token }}
           persist-credentials: false
       - run: scripts/build-web.sh
         env:
