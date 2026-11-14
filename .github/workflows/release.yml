@@ -182,6 +182,7 @@ jobs:
           alias=$(keytool -list -keystore "$RUNNER_TEMP/upload.jks" -storepass "$PASS" | sed -n 's/^\([^,]*\),.*PrivateKeyEntry.*/\1/p' | head -1)
           sha=$(keytool -list -v -keystore "$RUNNER_TEMP/upload.jks" -alias "$alias" -storepass "$PASS" | sed -n 's/.*SHA256: //p')
           echo "KEY_ALIAS=$alias" >> "$GITHUB_ENV"
+          echo "CERT_SHA256=$sha" >> "$GITHUB_ENV"
           echo "Upload key SHA-256 (for the App Links file pixel-realm will serve): \`$sha\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build the bundle and the APK
