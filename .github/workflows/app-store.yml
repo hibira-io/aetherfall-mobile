@@ -12,10 +12,9 @@
 # - inspect: prints the reference app's age rating and review details and
 #   this app's TestFlight builds (no phone numbers or passwords)
 # Nothing here submits for review: Danny presses "Add for Review" in App Store
-# Connect. The default step is `inspect` (read-only); every other step
-# changes the live listing. It runs only from main, in the APP_STORE
-# environment (give it a required reviewer and a main-only branch rule in
-# Settings → Environments), and only the ASC steps see the team key. App privacy answers ("App Privacy") have no public API and are
+# Connect. Like hibira-app it needs no extra environment: only people with
+# write access can run it, it runs only from main, and only the ASC steps see
+# the team key. App privacy answers ("App Privacy") have no public API and are
 # filled in App Store Connect from store/ios/privacy.md.
 name: app-store
 on:
@@ -27,8 +26,8 @@ on:
       step:
         description: What to update
         type: choice
-        options: [inspect, all, metadata, screenshots, pricing, build]
-        default: inspect
+        options: [all, metadata, screenshots, pricing, build, inspect]
+        default: all
 
 permissions:
   contents: read
@@ -45,7 +44,6 @@ jobs:
   update:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: APP_STORE
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
