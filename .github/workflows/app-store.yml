@@ -1,0 +1,72 @@
+# App Store listing: Actions → app-store → Run workflow. Mirrors
+# hibira-io/hibira-app's app-store.yml. Works on the iOS version being
+# prepared in App Store Connect (created as `version` when there is none),
+# with the same team API key as the release:
+# - metadata: store/ios/metadata (texts in every language, categories and game
+#   subcategories, age rating, content rights, review details; demo account
+#   from the secrets ASC_DEMO_USER / ASC_DEMO_PASSWORD when set)
+# - screenshots: store/ios/screenshots/<locale>/ (6.9" iPhone, landscape
+#   2868x1320); a locale without files keeps what it has
+# - pricing: free, in every territory except EXCLUDE_TERRITORIES
+# - build: attaches the newest processed TestFlight build to the version
+# - inspect: prints the reference app's age rating and review details and
+#   this app's TestFlight builds (no phone numbers or passwords)
+# Nothing here submits for review: Danny presses "Add for Review" in App Store
+# Connect. App privacy answers ("App Privacy") have no public API and are
+# filled in App Store Connect from store/ios/privacy.md.
+name: app-store
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to create when none is being prepared
+        default: "0.1.0"
+      step:
+        description: What to update
+        type: choice
+        options: [all, metadata, screenshots, pricing, build, inspect]
+        default: all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-store
+
+env:
+  ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+  ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+  ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+  BUNDLE_ID: io.hibira.aetherfall
+  REF_BUNDLE_ID: io.hibira.app
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with: { node-version: 22 }
+      - name: Inspect
+        if: inputs.step == 'inspect'
+        run: node .github/scripts/asc-inspect.mjs
+      - name: Metadata
+        if: inputs.step == 'all' || inputs.step == 'metadata'
+        env:
+          ASC_DEMO_USER: ${{ secrets.ASC_DEMO_USER }}
+          ASC_DEMO_PASSWORD: ${{ secrets.ASC_DEMO_PASSWORD }}
+        run: node .github/scripts/asc-metadata.mjs
+      - name: Screenshots
+        if: inputs.step == 'all' || inputs.step == 'screenshots'
+        run: node .github/scripts/asc-screenshots.mjs
+      - name: Free price and territories
+        if: inputs.step == 'all' || inputs.step == 'pricing'
+        env:
+          # Mainland China needs a game licence (ISBN) before a game can be
+          # sold there.
+          EXCLUDE_TERRITORIES: CHN
+        run: node .github/scripts/asc-pricing.mjs
+      - name: Newest TestFlight build on the version
+        if: inputs.step == 'all' || inputs.step == 'build'
+        run: node .github/scripts/asc-build.mjs
