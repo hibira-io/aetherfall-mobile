@@ -37,6 +37,24 @@ test("Android takes the version from the release workflow", () => {
   assert.match(read("android/app/src/main/AndroidManifest.xml"), /android:allowBackup="false"/);
 });
 
+test("the game plays fullscreen in landscape", () => {
+  // iPhone and iPad: landscape only, no status bar, no iPad split view.
+  const plist = read("ios/App/App/Info.plist");
+  for (const key of ["UISupportedInterfaceOrientations", "UISupportedInterfaceOrientations~ipad"]) {
+    const list = plist.split(`<key>${key}</key>`)[1].split("</array>")[0];
+    assert.match(list, /UIInterfaceOrientationLandscapeLeft/, key);
+    assert.match(list, /UIInterfaceOrientationLandscapeRight/, key);
+    assert.doesNotMatch(list, /Portrait/, key);
+  }
+  assert.match(plist, /<key>UIStatusBarHidden<\/key>\s*<true\/>/);
+  assert.match(plist, /<key>UIRequiresFullScreen<\/key>\s*<true\/>/);
+  // Android: sensor landscape, immersive (system bars hidden) in MainActivity.
+  assert.match(read("android/app/src/main/AndroidManifest.xml"), /android:screenOrientation="sensorLandscape"/);
+  const main = read("android/app/src/main/java/io/hibira/aetherfall/MainActivity.java");
+  assert.match(main, /hide\(WindowInsetsCompat\.Type\.systemBars\(\)\)/);
+  assert.match(main, /BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE/);
+});
+
 test("game client is pinned to a pixel-realm ref", () => {
   assert.match(read("pixel-realm.ref").trim(), /^[\w./-]+$/);
 });
