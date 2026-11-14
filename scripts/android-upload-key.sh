@@ -26,7 +26,9 @@ command -v gh >/dev/null || { echo "gh not found: brew install gh && gh auth log
 command -v openssl >/dev/null || { echo "openssl not found" >&2; exit 1; }
 gh auth status >/dev/null 2>&1 || { echo "gh is not signed in: gh auth login" >&2; exit 1; }
 
-if gh secret list -R "$REPO" | grep -q '^ANDROID_UPLOAD_KEYSTORE\b'; then
+# Fails closed: if the list can't be read (no admin rights, network), stop.
+secrets=$(gh secret list -R "$REPO") || { echo "Can't list $REPO secrets (need admin on the repo)." >&2; exit 1; }
+if printf '%s\n' "$secrets" | awk '$1 == "ANDROID_UPLOAD_KEYSTORE" { found = 1 } END { exit !found }'; then
   echo "$REPO already has ANDROID_UPLOAD_KEYSTORE; not replacing it (delete it first if you really mean to)." >&2
   exit 1
 fi
@@ -38,7 +40,7 @@ fi
 umask 077
 mkdir -p "$DIR"
 PASS=$(openssl rand -base64 33 | tr -d '/+=\n' | cut -c1-32)
-printf '%s\n' "$PASS" > "$DIR/password.txt"
+printf '%s' "$PASS" > "$DIR/password.txt"
 
 # The password goes through an environment variable, never the command line.
 export AF_KEY_PASS="$PASS"
@@ -56,4 +58,5 @@ gh secret set ANDROID_UPLOAD_PASSWORD -R "$REPO" < "$DIR/password.txt"
 
 echo "Done. $REPO now has ANDROID_UPLOAD_KEYSTORE and ANDROID_UPLOAD_PASSWORD."
 echo "Backup: $DIR (upload.jks, password.txt). Move it to a password manager or another safe place."
+echo "Note: if ~/Documents syncs to iCloud, the backup is uploaded there too; move it out if you don't want that."
 echo "Upload certificate SHA-256: $(cat "$DIR/sha256.txt")"

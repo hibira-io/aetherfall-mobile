@@ -219,37 +219,6 @@ jobs:
             ${{ runner.temp }}/apk/
           retention-days: 30
 
-      # The landing page's download (pixel-realm game-server/internal/downloads).
-      # The role only trusts this repo's matching GitHub environment and may
-      # only write android/* in that environment's bucket.
-      - name: Check the downloads bucket settings
-        id: publish
-        env:
-          BUCKET: ${{ vars.APK_BUCKET }}
-          ROLE: ${{ vars.APK_PUBLISH_ROLE_ARN }}
-        run: |
-          if [ -n "$BUCKET" ] && [ -n "$ROLE" ]; then echo "on=true" >> "$GITHUB_OUTPUT"
-          else echo "::warning::APK_BUCKET / APK_PUBLISH_ROLE_ARN not set for this environment: the APK stays a run artifact and the landing page is not updated"; fi
-      - if: steps.publish.outputs.on == 'true'
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
-        with:
-          role-to-assume: ${{ vars.APK_PUBLISH_ROLE_ARN }}
-          aws-region: ap-northeast-1
-      - name: Publish the APK to the landing page
-        if: steps.publish.outputs.on == 'true'
-        env:
-          BUCKET: ${{ vars.APK_BUCKET }}
-          FILE: ${{ steps.apk.outputs.file }}
-        run: |
-          set -euo pipefail
-          # The APK first, then the manifest that points at it, so the page
-          # never links to a file that isn't there yet.
-          aws s3 cp "$RUNNER_TEMP/apk/$(basename "$FILE")" "s3://$BUCKET/$FILE" \
-            --content-type application/vnd.android.package-archive --no-progress
-          aws s3 cp "$RUNNER_TEMP/apk/latest.json" "s3://$BUCKET/android/latest.json" \
-            --content-type application/json --cache-control no-cache --no-progress
-          echo "Published \`$FILE\` to the landing page (s3://$BUCKET)." >> "$GITHUB_STEP_SUMMARY"
-
       - name: Upload to Play
         env:
           PLAY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
@@ -261,6 +230,51 @@ jobs:
           releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
           track: ${{ needs.version.outputs.env == 'prd' && 'production' || needs.version.outputs.env == 'uat' && 'alpha' || 'internal' }}
           status: draft
+
+      # The landing page's download (pixel-realm game-server/internal/downloads).
+      # The role only trusts this repo's matching GitHub environment and may
+      # only write android/* in that environment's bucket.
+      - name: Check the downloads bucket settings
+        id: publish
+        env:
+          BUCKET: ${{ vars.APK_BUCKET }}
+          ROLE: ${{ vars.APK_PUBLISH_ROLE_ARN }}
+        run: |
+          if [ -n "$BUCKET" ] && [ -n "$ROLE" ]; then echo "on=true" >> "$GITHUB_OUTPUT"
+          else echo "::warning::APK_BUCKET / APK_PUBLISH_ROLE_ARN not set for this environment: the APK stays a run artifact and the landing page is not updated"; fi
+      # After the Play upload and non-fatal, so a publish problem never
+      # blocks the store build.
+      - if: steps.publish.outputs.on == 'true'
+        continue-on-error: true
+        id: aws
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
+        with:
+          role-to-assume: ${{ vars.APK_PUBLISH_ROLE_ARN }}
+          aws-region: ap-northeast-1
+      - name: Publish the APK to the landing page
+        if: steps.publish.outputs.on == 'true' && steps.aws.outcome == 'success'
+        continue-on-error: true
+        env:
+          BUCKET: ${{ vars.APK_BUCKET }}
+          FILE: ${{ steps.apk.outputs.file }}
+          CODE: ${{ needs.version.outputs.code }}
+        run: |
+          set -euo pipefail
+          # A re-run of an older tag must not roll the page back.
+          if aws s3 cp "s3://$BUCKET/android/latest.json" "$RUNNER_TEMP/published.json" --no-progress 2>/dev/null; then
+            published=$(jq -r '.build // 0' "$RUNNER_TEMP/published.json")
+            if [ "$published" -gt "$CODE" ]; then
+              echo "::warning::The landing page already offers build $published (newer than $CODE); not replacing it"
+              exit 0
+            fi
+          fi
+          # The APK first, then the manifest that points at it, so the page
+          # never links to a file that isn't there yet.
+          aws s3 cp "$RUNNER_TEMP/apk/$(basename "$FILE")" "s3://$BUCKET/$FILE" \
+            --content-type application/vnd.android.package-archive --no-progress
+          aws s3 cp "$RUNNER_TEMP/apk/latest.json" "s3://$BUCKET/android/latest.json" \
+            --content-type application/json --cache-control no-cache --no-progress
+          echo "Published \`$FILE\` to the landing page (s3://$BUCKET)." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Clean up
         if: always()
