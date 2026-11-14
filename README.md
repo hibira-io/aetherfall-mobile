@@ -25,13 +25,17 @@ and pixel-realm's `docs/gameplay/product-mobile-strategy-v1.0.md` (Codex's desig
 ```sh
 npm ci
 scripts/build-web.sh                         # clone pixel-realm (pixel-realm.ref), build the client for DEV into www/
-AETHERFALL_ENV=http://192.168.1.20:8080 \
-  PIXEL_REALM_DIR=../pixel-realm scripts/build-web.sh   # your checkout, a server on your network
+AETHERFALL_ENV=https://<your-tunnel-host> \
+  PIXEL_REALM_DIR=../pixel-realm scripts/build-web.sh   # your checkout, your own server behind an HTTPS tunnel
 npx cap sync                                 # copy www/ and plugins into ios/ and android/
 npx cap open android                         # Android Studio
 npx cap open ios                             # Xcode, on a Mac
 npm test                                     # IDs, version plumbing and tag mapping agree
 ```
+
+Plain `http://` servers are refused: the app's pages load from `https://localhost` / `capacitor://localhost`, so
+http calls are mixed content, and store builds keep cleartext off. The server also needs that origin in
+`ALLOWED_ORIGINS`.
 
 Bump `pixel-realm.ref` (a branch, tag or commit) in a pull request to ship a newer game client.
 

@@ -23,6 +23,11 @@ test("the game ships inside the app, not as a remote site", () => {
   assert.equal(config.server?.url, undefined);
   assert.equal(config.ios.appendUserAgent, "AetherfallApp/ios");
   assert.equal(config.android.appendUserAgent, "AetherfallApp/android");
+  // `ios.scheme` names the Xcode scheme for `cap run ios`; the project only has "App".
+  assert.equal(config.ios.scheme, undefined);
+  // Store builds stay HTTPS-only: no mixed content, no cleartext.
+  assert.equal(config.android.allowMixedContent, false);
+  assert.ok(!/usesCleartextTraffic="true"/.test(read("android/app/src/main/AndroidManifest.xml")));
 });
 
 test("Android takes the version from the release workflow", () => {

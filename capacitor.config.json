@@ -4,8 +4,7 @@
   "webDir": "www",
   "ios": {
     "appendUserAgent": "AetherfallApp/ios",
-    "contentInset": "never",
-    "scheme": "Aetherfall"
+    "contentInset": "never"
   },
   "android": {
     "appendUserAgent": "AetherfallApp/android",
