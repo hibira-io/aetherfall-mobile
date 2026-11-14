@@ -5,8 +5,10 @@
 #   ANDROID_UPLOAD_KEYSTORE   base64 of the .jks
 #   ANDROID_UPLOAD_PASSWORD   random, used for the store and the key
 #
-# Run once on a trusted computer that has keytool (any JDK) and gh signed in
-# as an admin of hibira-io/aetherfall-mobile:
+# Run once on a trusted computer with openssl (built into macOS; no Java
+# needed) and gh signed in as an admin of hibira-io/aetherfall-mobile. The
+# keystore is PKCS12 (alias "upload"), which the JDK's keytool and Gradle in
+# CI read like a .jks:
 #
 #   scripts/android-upload-key.sh [backup-dir]     # default ~/Documents/aetherfall-android-key
 #
@@ -21,7 +23,6 @@ REPO=${REPO:-hibira-io/aetherfall-mobile}
 DIR=${1:-"$HOME/Documents/aetherfall-android-key"}
 ALIAS=upload
 
-command -v keytool >/dev/null || { echo "keytool not found: install a JDK (e.g. brew install --cask temurin)" >&2; exit 1; }
 command -v gh >/dev/null || { echo "gh not found: brew install gh && gh auth login" >&2; exit 1; }
 command -v openssl >/dev/null || { echo "openssl not found" >&2; exit 1; }
 gh auth status >/dev/null 2>&1 || { echo "gh is not signed in: gh auth login" >&2; exit 1; }
@@ -44,13 +45,13 @@ printf '%s' "$PASS" > "$DIR/password.txt"
 
 # The password goes through an environment variable, never the command line.
 export AF_KEY_PASS="$PASS"
-keytool -genkeypair -keystore "$DIR/upload.jks" -storetype PKCS12 -alias "$ALIAS" \
-  -keyalg RSA -keysize 4096 -validity 10000 \
-  -dname "CN=Aetherfall, O=Hibira, C=TW" \
-  -storepass:env AF_KEY_PASS -keypass:env AF_KEY_PASS >/dev/null
-
-keytool -list -v -keystore "$DIR/upload.jks" -alias "$ALIAS" -storepass:env AF_KEY_PASS \
-  | sed -n 's/^[[:space:]]*SHA256: //p' > "$DIR/sha256.txt"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+openssl req -x509 -newkey rsa:4096 -nodes -keyout "$tmp/k.pem" -out "$tmp/c.pem" -days 10000 \
+  -subj "/CN=Aetherfall/O=Hibira/C=TW" 2>/dev/null
+openssl pkcs12 -export -inkey "$tmp/k.pem" -in "$tmp/c.pem" -name "$ALIAS" \
+  -out "$DIR/upload.jks" -passout env:AF_KEY_PASS
+openssl x509 -in "$tmp/c.pem" -noout -fingerprint -sha256 | sed 's/^.*=//' > "$DIR/sha256.txt"
 unset AF_KEY_PASS
 
 base64 < "$DIR/upload.jks" | tr -d '\n' | gh secret set ANDROID_UPLOAD_KEYSTORE -R "$REPO"

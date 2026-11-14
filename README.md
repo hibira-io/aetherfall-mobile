@@ -70,7 +70,7 @@ Most of it is shared with the Hibira app (same Apple team and org secrets):
 2. **Secrets.** Add this repo to the org secrets/variables the Hibira app uses: `APPLE_TEAM_ID` (variable),
    `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`. Android: `ANDROID_UPLOAD_KEYSTORE` (base64 of a new upload `.jks`
    for this app), `ANDROID_UPLOAD_PASSWORD`; optional `PLAY_SERVICE_ACCOUNT_JSON` to upload to Play. Make the key
-   with `scripts/android-upload-key.sh` on a trusted Mac (keytool + `gh` signed in as a repo admin): it generates
+   with `scripts/android-upload-key.sh` on a trusted Mac (openssl, no Java needed; `gh` signed in as a repo admin): it generates
    a random password, stores both secrets without printing them, and keeps a backup in
    `~/Documents/aetherfall-android-key` (move it to a password manager).
    Landing page APK: per GitHub environment (DEV/UAT/PRD), variables `APK_BUCKET` and `APK_PUBLISH_ROLE_ARN` from
