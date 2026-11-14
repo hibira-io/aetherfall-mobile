@@ -1,0 +1,26 @@
+{
+  "name": "aetherfall-mobile",
+  "private": true,
+  "description": "Aetherfall (星核崩落) for iPhone and Android (Capacitor). Wraps the game client built from hibira-io/pixel-realm; the Go server stays authoritative.",
+  "type": "module",
+  "scripts": {
+    "web": "bash scripts/build-web.sh",
+    "sync": "cap sync",
+    "ios:open": "cap open ios",
+    "android:open": "cap open android",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/haptics": "8.0.2",
+    "@capacitor/ios": "8.6.0",
+    "@capacitor/screen-orientation": "8.0.2",
+    "@capacitor/splash-screen": "8.0.2",
+    "@capacitor/status-bar": "8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0"
+  }
+}

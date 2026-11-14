@@ -1,0 +1,104 @@
+# Pull requests: prove both apps still build (no signing) and the checks pass.
+# Mirrors hibira-io/hibira-app's ci.yml; the extra step builds the game client
+# from hibira-io/pixel-realm (pixel-realm.ref) into www/ first.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm test
+      - name: shellcheck
+        run: shellcheck -S warning scripts/*.sh .github/scripts/*.sh
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with: { node-version: 22 }
+      - name: pixel-realm ref
+        id: pr
+        env:
+          OVERRIDE: ''
+          CLIENT_ID: ${{ vars.HIBIRA_CI_APP_CLIENT_ID }}
+          KEY: ${{ secrets.HIBIRA_CI_APP_PRIVATE_KEY }}
+        run: |
+          [ -n "$CLIENT_ID" ] && [ -n "$KEY" ] || { echo "::error::Missing variable HIBIRA_CI_APP_CLIENT_ID or secret HIBIRA_CI_APP_PRIVATE_KEY (the Hibira CI GitHub App): see README"; exit 1; }
+          echo "ref=${OVERRIDE:-$(tr -d '[:space:]' < pixel-realm.ref)}" >> "$GITHUB_OUTPUT"
+      # A one-hour token that can only read pixel-realm (pixel-realm is private).
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.HIBIRA_CI_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HIBIRA_CI_APP_PRIVATE_KEY }}
+          owner: hibira-io
+          repositories: pixel-realm
+          permission-contents: read
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: hibira-io/pixel-realm
+          ref: ${{ steps.pr.outputs.ref }}
+          path: .cache/pixel-realm
+          token: ${{ steps.app.outputs.token }}
+          persist-credentials: false
+      - run: scripts/build-web.sh
+        env:
+          AETHERFALL_ENV: dev
+          PIXEL_REALM_DIR: .cache/pixel-realm
+          PIXEL_REALM_REF: ${{ steps.pr.outputs.ref }}
+      - run: cat www/build-info.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with: { name: www, path: www, retention-days: 3 }
+
+  android:
+    needs: web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with: { name: www, path: www }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with: { distribution: temurin, java-version: "21", cache: gradle }
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with: { packages: "platforms;android-36 build-tools;36.0.0" }
+      - run: npm ci && npx cap sync android
+      - run: cd android && chmod +x gradlew && ./gradlew --no-daemon assembleDebug
+      # An unsigned-for-store debug APK any test phone can install (DEV server).
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: aetherfall-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+  ios:
+    needs: web
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with: { name: www, path: www }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with: { node-version: 22, cache: npm }
+      - run: npm ci && npx cap sync ios
+      - run: >
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug
+          -sdk iphonesimulator -destination "generic/platform=iOS Simulator"
+          CODE_SIGNING_ALLOWED=NO build

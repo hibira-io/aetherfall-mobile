@@ -1,0 +1,116 @@
+# A signed APK to install by hand on a test phone (no Play needed), as in
+# hibira-io/hibira-app. Actions → android-apk → Run workflow; the APK is the
+# run's artifact. Same upload key as the release build, so a later Play
+# install updates it in place. For an unsigned debug APK, use the one every
+# ci run keeps (aetherfall-debug-apk).
+name: android-apk
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version name shown in the app
+        default: "0.1.0"
+      server:
+        description: Game server the app talks to
+        type: choice
+        options: [dev, uat, prd]
+        default: dev
+      pixel_realm_ref:
+        description: pixel-realm branch, tag or commit (empty = pixel-realm.ref)
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with: { distribution: temurin, java-version: "21", cache: gradle }
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with: { packages: "platforms;android-36 build-tools;36.0.0" }
+
+      - name: Version
+        id: version
+        env:
+          V: ${{ inputs.version || '0.1.0' }}
+        run: |
+          set -euo pipefail
+          [[ "$V" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || { echo "::error::version must look like 1.2.3"; exit 1; }
+          echo "name=$V" >> "$GITHUB_OUTPUT"
+          echo "code=$(( (10#${BASH_REMATCH[1]} * 1000000 + 10#${BASH_REMATCH[2]} * 1000 + 10#${BASH_REMATCH[3]}) * 100 ))" >> "$GITHUB_OUTPUT"
+
+      - name: pixel-realm ref
+        id: pr
+        env:
+          OVERRIDE: ${{ inputs.pixel_realm_ref }}
+          CLIENT_ID: ${{ vars.HIBIRA_CI_APP_CLIENT_ID }}
+          KEY: ${{ secrets.HIBIRA_CI_APP_PRIVATE_KEY }}
+        run: |
+          [ -n "$CLIENT_ID" ] && [ -n "$KEY" ] || { echo "::error::Missing variable HIBIRA_CI_APP_CLIENT_ID or secret HIBIRA_CI_APP_PRIVATE_KEY (the Hibira CI GitHub App): see README"; exit 1; }
+          echo "ref=${OVERRIDE:-$(tr -d '[:space:]' < pixel-realm.ref)}" >> "$GITHUB_OUTPUT"
+      # A one-hour token that can only read pixel-realm (pixel-realm is private).
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.HIBIRA_CI_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HIBIRA_CI_APP_PRIVATE_KEY }}
+          owner: hibira-io
+          repositories: pixel-realm
+          permission-contents: read
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: hibira-io/pixel-realm
+          ref: ${{ steps.pr.outputs.ref }}
+          path: .cache/pixel-realm
+          token: ${{ steps.app.outputs.token }}
+          persist-credentials: false
+      - name: Game client
+        env:
+          AETHERFALL_ENV: ${{ inputs.server }}
+          PIXEL_REALM_DIR: .cache/pixel-realm
+          PIXEL_REALM_REF: ${{ steps.pr.outputs.ref }}
+        run: scripts/build-web.sh && cat www/build-info.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keys
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE }}
+          PASS: ${{ secrets.ANDROID_UPLOAD_PASSWORD }}
+        run: |
+          set -euo pipefail
+          [ -n "$KEYSTORE" ] && [ -n "$PASS" ] || { echo "::error::Missing ANDROID_UPLOAD_KEYSTORE / ANDROID_UPLOAD_PASSWORD"; exit 1; }
+          printf %s "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          alias=$(keytool -list -keystore "$RUNNER_TEMP/upload.jks" -storepass "$PASS" | sed -n 's/^\([^,]*\),.*PrivateKeyEntry.*/\1/p' | head -1)
+          echo "KEY_ALIAS=$alias" >> "$GITHUB_ENV"
+
+      - name: Build the APK
+        env:
+          PASS: ${{ secrets.ANDROID_UPLOAD_PASSWORD }}
+          CODE: ${{ steps.version.outputs.code }}
+          NAME: ${{ steps.version.outputs.name }}
+        run: |
+          set -euo pipefail
+          npm ci && npx cap sync android
+          cd android && chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease \
+            -PversionCode="$CODE" -PversionName="$NAME" \
+            -Pandroid.injected.signing.store.file="$RUNNER_TEMP/upload.jks" \
+            -Pandroid.injected.signing.store.password="$PASS" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$PASS"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/aetherfall-$NAME.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging "$RUNNER_TEMP/aetherfall-$NAME.apk" | grep -E "^package|sdkVersion" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: aetherfall-${{ steps.version.outputs.name }}-${{ inputs.server }}-apk
+          path: ${{ runner.temp }}/aetherfall-${{ steps.version.outputs.name }}.apk
+          retention-days: 30
+
+      - name: Clean up
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.jks"
