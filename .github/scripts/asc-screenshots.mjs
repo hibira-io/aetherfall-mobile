@@ -64,9 +64,12 @@ for (const locale of folders) {
 
   const sets = (await asc("GET", `/appStoreVersionLocalizations/${loc.id}/appScreenshotSets?limit=50`)).data;
   let set = sets.find((/** @type {any} */ s) => s.attributes.screenshotDisplayType === DISPLAY);
+  // The old shots stay until every new one has uploaded, so a failed run
+  // never leaves a language without screenshots. A set holds at most 10.
+  let old = [];
   if (set) {
-    const old = (await asc("GET", `/appScreenshotSets/${set.id}/appScreenshots?limit=50`)).data;
-    for (const s of old) await asc("DELETE", `/appScreenshots/${s.id}`);
+    old = (await asc("GET", `/appScreenshotSets/${set.id}/appScreenshots?limit=50`)).data;
+    if (old.length + files.length > 10) throw new Error(`${locale}: ${old.length} screenshots there + ${files.length} new is over 10; remove some in App Store Connect first`);
   } else {
     set = (await asc("POST", "/appScreenshotSets", {
       data: {
@@ -102,6 +105,7 @@ for (const locale of folders) {
     ids.push(shot.id);
     console.log(`${locale}/${name} uploaded`);
   }
+  for (const o of old) await asc("DELETE", `/appScreenshots/${o.id}`);
   await asc("PATCH", `/appScreenshotSets/${set.id}/relationships/appScreenshots`, {
     data: ids.map((id) => ({ type: "appScreenshots", id })),
   });

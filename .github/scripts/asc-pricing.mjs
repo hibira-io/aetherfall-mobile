@@ -1,7 +1,8 @@
 // Makes the app free and sets where it is sold: every App Store territory
 // except those in EXCLUDE_TERRITORIES (comma-separated ISO 3166 alpha-3,
-// e.g. "JPN,CHN"), plus new territories as Apple adds them. Re-running
-// replaces both the price schedule and the availability.
+// e.g. "JPN,CHN"). Territories Apple adds later stay off until this is run
+// again, so a market that needs a game licence never opens by itself.
+// Re-running replaces both the price schedule and the availability.
 import { asc, findApp } from "./asc-api.mjs";
 
 const app = await findApp(process.env.BUNDLE_ID);
@@ -44,7 +45,7 @@ const items = territories.map((id, i) => ({
 await asc("POST", "https://api.appstoreconnect.apple.com/v2/appAvailabilities", {
   data: {
     type: "appAvailabilities",
-    attributes: { availableInNewTerritories: true },
+    attributes: { availableInNewTerritories: false },
     relationships: {
       app: { data: { type: "apps", id: app.id } },
       territoryAvailabilities: { data: items.map(({ type, id }) => ({ type, id })) },
