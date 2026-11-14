@@ -53,6 +53,11 @@ Build numbers come from the tag (`.github/scripts/app-version.sh`): `v1.2.3-dev.
 `-rc.N` → `+ 50 + N`, the release → `+ 99`, so every upload goes up. Nothing is sent for App Store review or
 rolled out on Play automatically; a person does that, and PRD needs Danny's approval.
 
+Every tag also builds a signed **test APK** and, when the GitHub environment has `APK_BUCKET` and
+`APK_PUBLISH_ROLE_ARN`, publishes it to that environment's landing page download (dev tag → DEV site, rc → UAT,
+release → PRD; pixel-realm `docs/operations/android-apk.md`). Players install it before the app is on Play; once it
+is, a Play install can't update the hand-installed APK (different signing key), so they uninstall it first.
+
 Pull requests build both apps without signing (`ci.yml`) and keep a debug APK (DEV server) as the run's
 artifact. **android-apk** (Run workflow) makes a signed APK for any server to install by hand.
 
@@ -64,9 +69,12 @@ Most of it is shared with the Hibira app (same Apple team and org secrets):
    come with M2). App Store Connect: new app with that bundle ID, named 「星核崩落」.
 2. **Secrets.** Add this repo to the org secrets/variables the Hibira app uses: `APPLE_TEAM_ID` (variable),
    `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`. Android: `ANDROID_UPLOAD_KEYSTORE` (base64 of a new upload `.jks`
-   for this app), `ANDROID_UPLOAD_PASSWORD`; optional `PLAY_SERVICE_ACCOUNT_JSON` to upload to Play. Make the key:
-   `keytool -genkeypair -keystore upload.jks -alias upload -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=Aetherfall, O=Hibira, C=TW"`,
-   then `base64 -i upload.jks | gh secret set ANDROID_UPLOAD_KEYSTORE -R hibira-io/aetherfall-mobile`.
+   for this app), `ANDROID_UPLOAD_PASSWORD`; optional `PLAY_SERVICE_ACCOUNT_JSON` to upload to Play. Make the key
+   with `scripts/android-upload-key.sh` on a trusted Mac (openssl, no Java needed; `gh` signed in as a repo admin): it generates
+   a random password, stores both secrets without printing them, and keeps a backup in
+   `~/Documents/aetherfall-android-key` (move it to a password manager).
+   Landing page APK: per GitHub environment (DEV/UAT/PRD), variables `APK_BUCKET` and `APK_PUBLISH_ROLE_ARN` from
+   pixel-realm's infra outputs `android_downloads_bucket` / `android_apk_publish_role_arn`.
 3. **Play Console.** Create the app `io.hibira.aetherfall`; the very first bundle is uploaded by hand.
 4. **pixel-realm read access.** pixel-realm is private, and the hibira-io enterprise turns deploy keys off, so CI
    reads it through the org's GitHub App **Hibira CI** (org-owned, not tied to a person). Each job asks it for a

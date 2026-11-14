@@ -1,8 +1,10 @@
 # A signed APK to install by hand on a test phone (no Play needed), as in
 # hibira-io/hibira-app. Actions → android-apk → Run workflow; the APK is the
-# run's artifact. Same upload key as the release build, so a later Play
-# install updates it in place. For an unsigned debug APK, use the one every
-# ci run keeps (aetherfall-debug-apk).
+# run's artifact. Same upload key as the release build. Release tags also
+# publish a signed APK to the landing page (release.yml). Once the app is on
+# Play (re-signed with Google's app signing key), a Play install can't update
+# a hand-installed APK: uninstall it first. For an unsigned debug APK, use
+# the one every ci run keeps (aetherfall-debug-apk).
 name: android-apk
 on:
   workflow_dispatch:
