@@ -82,3 +82,12 @@ test("release tags map to servers and rising build numbers", () => {
   assert.throws(() => version("v1.0"));
   assert.throws(() => version("v1.0.0-dev.50"));
 });
+
+test("in-app purchases go through the store plugin, finished by the game client", () => {
+  // pixel-realm game-client/src/net/iap.ts drives @capgo/native-purchases and the
+  // Go server verifies and grants (docs/gameplay/store-iap-sync-v1.0.md).
+  const pkg = JSON.parse(read("package.json"));
+  assert.equal(pkg.dependencies["@capgo/native-purchases"], "8.9.6");
+  assert.match(read("ios/App/CapApp-SPM/Package.swift"), /CapgoNativePurchases/);
+  assert.match(read("android/capacitor.settings.gradle"), /capgo-native-purchases/);
+});
