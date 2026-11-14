@@ -12,6 +12,11 @@
 #   Android  ANDROID_UPLOAD_KEYSTORE (base64 of the .jks),
 #            ANDROID_UPLOAD_PASSWORD,
 #            PLAY_SERVICE_ACCOUNT_JSON (optional: upload to Play)
+#            APK_BUCKET, APK_PUBLISH_ROLE_ARN (GitHub environment variables,
+#            optional): publish the signed test APK to the landing page's
+#            downloads bucket (pixel-realm infra/downloads.tf and
+#            docs/operations/android-apk.md). Without them the APK is only a
+#            run artifact.
 #   Game     HIBIRA_CI_APP_CLIENT_ID (org variable), HIBIRA_CI_APP_PRIVATE_KEY (org
 #            secret): the Hibira CI GitHub App, installed on pixel-realm
 name: release
@@ -151,6 +156,9 @@ jobs:
   android:
     needs: [version, web]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC: publish the test APK (APK_PUBLISH_ROLE_ARN)
     environment: ${{ needs.version.outputs.env == 'prd' && 'PRD' || needs.version.outputs.env == 'uat' && 'UAT' || 'DEV' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -176,7 +184,7 @@ jobs:
           echo "KEY_ALIAS=$alias" >> "$GITHUB_ENV"
           echo "Upload key SHA-256 (for the App Links file pixel-realm will serve): \`$sha\`" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Build the bundle
+      - name: Build the bundle and the APK
         env:
           PASS: ${{ secrets.ANDROID_UPLOAD_PASSWORD }}
           CODE: ${{ needs.version.outputs.code }}
@@ -185,18 +193,62 @@ jobs:
           set -euo pipefail
           npm ci && npx cap sync android
           cd android && chmod +x gradlew
-          ./gradlew --no-daemon bundleRelease \
+          # The bundle goes to Play; the APK (same build, same upload key) is
+          # the test build players install from the landing page.
+          ./gradlew --no-daemon bundleRelease assembleRelease \
             -PversionCode="$CODE" -PversionName="$NAME" \
             -Pandroid.injected.signing.store.file="$RUNNER_TEMP/upload.jks" \
             -Pandroid.injected.signing.store.password="$PASS" \
             -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
             -Pandroid.injected.signing.key.password="$PASS"
 
+      - name: Test APK and its manifest
+        id: apk
+        env:
+          TAG: ${{ github.ref_name }}
+          CODE: ${{ needs.version.outputs.code }}
+          NAME: ${{ needs.version.outputs.name }}
+          CHANNEL: ${{ needs.version.outputs.env }}
+        run: .github/scripts/apk-manifest.sh android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/apk"
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: aetherfall-android-${{ needs.version.outputs.name }}-${{ needs.version.outputs.code }}
-          path: android/app/build/outputs/bundle/release/app-release.aab
+          path: |
+            android/app/build/outputs/bundle/release/app-release.aab
+            ${{ runner.temp }}/apk/
           retention-days: 30
+
+      # The landing page's download (pixel-realm game-server/internal/downloads).
+      # The role only trusts this repo's matching GitHub environment and may
+      # only write android/* in that environment's bucket.
+      - name: Check the downloads bucket settings
+        id: publish
+        env:
+          BUCKET: ${{ vars.APK_BUCKET }}
+          ROLE: ${{ vars.APK_PUBLISH_ROLE_ARN }}
+        run: |
+          if [ -n "$BUCKET" ] && [ -n "$ROLE" ]; then echo "on=true" >> "$GITHUB_OUTPUT"
+          else echo "::warning::APK_BUCKET / APK_PUBLISH_ROLE_ARN not set for this environment: the APK stays a run artifact and the landing page is not updated"; fi
+      - if: steps.publish.outputs.on == 'true'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6
+        with:
+          role-to-assume: ${{ vars.APK_PUBLISH_ROLE_ARN }}
+          aws-region: ap-northeast-1
+      - name: Publish the APK to the landing page
+        if: steps.publish.outputs.on == 'true'
+        env:
+          BUCKET: ${{ vars.APK_BUCKET }}
+          FILE: ${{ steps.apk.outputs.file }}
+        run: |
+          set -euo pipefail
+          # The APK first, then the manifest that points at it, so the page
+          # never links to a file that isn't there yet.
+          aws s3 cp "$RUNNER_TEMP/apk/$(basename "$FILE")" "s3://$BUCKET/$FILE" \
+            --content-type application/vnd.android.package-archive --no-progress
+          aws s3 cp "$RUNNER_TEMP/apk/latest.json" "s3://$BUCKET/android/latest.json" \
+            --content-type application/json --cache-control no-cache --no-progress
+          echo "Published \`$FILE\` to the landing page (s3://$BUCKET)." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload to Play
         env:
