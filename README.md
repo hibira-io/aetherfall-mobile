@@ -103,7 +103,7 @@ Most of it is shared with the Hibira app (same Apple team and org secrets):
 - **M1** device check: touch controls, safe areas, landscape lock in combat, pause/disconnect on background and
   reconnect on resume, frame-rate report on a low-end Android, a mid-range Android and an older iPhone.
 - **M2** native features, following the Hibira app: provider sign-in in the system browser coming back on the
-  app's scheme with a one-time secret (Google refuses web views), Sign in with Apple (guideline 4.8), Hibira Push
+  app's scheme with a one-time secret (Google refuses web views), Sign in with Apple (guideline 4.8; done: native sheet via `plugins/aetherfall-apple-sign-in`, the server redeems the code), Hibira Push
   via `hibira-push-ios` / `hibira-push-android`, haptics, in-app account deletion.
 - **M3** store listing (Codex makes the icon, splash and store art), privacy forms, age rating, review account.
 
