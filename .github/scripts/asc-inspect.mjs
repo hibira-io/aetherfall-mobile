@@ -17,7 +17,7 @@ for (const bundle of [process.env.REF_BUNDLE_ID || "io.hibira.app", process.env.
     if (rd?.data) {
       const a = rd.data.attributes;
       console.log("review:", JSON.stringify({ hasContactName: !!(a.contactFirstName || a.contactLastName), hasEmail: !!a.contactEmail, hasPhone: !!a.contactPhone, demoAccountRequired: a.demoAccountRequired, hasDemoAccount: !!a.demoAccountName, notesLength: a.notes?.length }));
-    } else console.log("review:", JSON.stringify(rd));
+    } else console.log("review:", rd?.error ? "not readable" : "none");
     break;
   }
 }
