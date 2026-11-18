@@ -98,6 +98,19 @@ Most of it is shared with the Hibira app (same Apple team and org secrets):
    install it on more repos or add permissions as needed.
 5. **Environments.** `DEV`, `UAT` and `PRD` are created on first use; give `PRD` a required reviewer.
 
+## Public repository
+
+This repo can be public: it holds only the Capacitor shell, and the game client is built from private
+pixel-realm in CI. Keep it that way:
+
+- Never commit keystores, `.p8` keys, provisioning profiles, `google-services.json` or `.env` (see `.gitignore`).
+  Secrets live in GitHub secrets only.
+- Workflow logs, step summaries and artifacts are public too: print no names, emails, phone numbers, demo
+  accounts or tokens (the ASC scripts print only whether a field is set).
+- Pull requests from forks get no secrets, so `ci` runs only `check` for them. Never switch a workflow to
+  `pull_request_target`.
+- `LICENSE`: all rights reserved; the code is readable, not reusable.
+
 ## What comes next
 
 - **M1** device check: touch controls, safe areas, landscape lock in combat, pause/disconnect on background and
