@@ -18,6 +18,16 @@ function token() {
   return `${head}.${body}.${b64url(sig)}`;
 }
 
+/** ASC error codes and titles only: the body can echo what was sent (contact
+ * details, demo account), and workflow logs are public. */
+function ascErrorSummary(/** @type {string} */ text) {
+  try {
+    const errs = JSON.parse(text)?.errors;
+    if (Array.isArray(errs)) return errs.map((/** @type {any} */ e) => `${e.code ?? ""} ${e.title ?? ""}`.trim()).join("; ");
+  } catch {}
+  return "(non-JSON body omitted)";
+}
+
 /** @param {string} method @param {string} path @param {any} [body] */
 export async function asc(method, path, body) {
   const res = await fetch(path.startsWith("http") ? path : API + path, {
@@ -27,7 +37,7 @@ export async function asc(method, path, body) {
   });
   if (res.status === 204) return null;
   const text = await res.text();
-  if (!res.ok) throw new Error(`${method} ${path}: ${res.status} ${text}`);
+  if (!res.ok) throw new Error(`${method} ${path}: ${res.status} ${ascErrorSummary(text)}`);
   return text ? JSON.parse(text) : null;
 }
 
