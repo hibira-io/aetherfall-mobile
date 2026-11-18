@@ -122,7 +122,7 @@ if (existing) {
     data: { type: "appStoreReviewDetails", attributes: review, relationships: { appStoreVersion: { data: { type: "appStoreVersions", id: version.id } } } },
   });
 }
-summary += `- review details: contact ${contact.contactFirstName} ${contact.contactLastName}, demo account ${ASC_DEMO_USER ? "set" : "NOT set (add ASC_DEMO_USER / ASC_DEMO_PASSWORD)"}\n`;
+summary += `- review details: contact copied from the reference app, demo account ${ASC_DEMO_USER ? "set" : "NOT set (add ASC_DEMO_USER / ASC_DEMO_PASSWORD)"}\n`;
 
 console.log(summary);
 if (process.env.GITHUB_STEP_SUMMARY) {

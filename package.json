@@ -1,6 +1,7 @@
 {
   "name": "aetherfall-mobile",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Aetherfall (星核崩落) for iPhone and Android (Capacitor). Wraps the game client built from hibira-io/pixel-realm; the Go server stays authoritative.",
   "type": "module",
   "scripts": {

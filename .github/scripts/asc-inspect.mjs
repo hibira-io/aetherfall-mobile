@@ -16,7 +16,7 @@ for (const bundle of [process.env.REF_BUNDLE_ID || "io.hibira.app", process.env.
     const rd = await asc("GET", `/appStoreVersions/${v.id}/appStoreReviewDetail`).catch((e) => ({ error: String(e).slice(0, 120) }));
     if (rd?.data) {
       const a = rd.data.attributes;
-      console.log("review:", JSON.stringify({ contactFirstName: a.contactFirstName, contactLastName: a.contactLastName, hasEmail: !!a.contactEmail, hasPhone: !!a.contactPhone, demoAccountRequired: a.demoAccountRequired, demoAccountName: a.demoAccountName, notesLength: a.notes?.length }));
+      console.log("review:", JSON.stringify({ hasContactName: !!(a.contactFirstName || a.contactLastName), hasEmail: !!a.contactEmail, hasPhone: !!a.contactPhone, demoAccountRequired: a.demoAccountRequired, hasDemoAccount: !!a.demoAccountName, notesLength: a.notes?.length }));
     } else console.log("review:", JSON.stringify(rd));
     break;
   }
